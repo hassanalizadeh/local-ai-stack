@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL (Required for Langfuse)
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: securepassword
+      POSTGRES_DB: langfuse
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    networks:
+      - ai-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Redis (Caching for LiteLLM & Queue for Langfuse)
+  redis:
+    image: redis:alpine
+    container_name: ai_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - ./data/redis:/data
+    networks:
+      - ai-net
+
+  # 3. Qdrant (Vector Database for Embeddings)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: ai_qdrant
+    restart: always
+    ports:
+      - "6333:6333" # REST API
+      - "6334:6334" # gRPC API
+    volumes:
+      - ./data/qdrant:/qdrant/storage
+    networks:
+      - ai-net
+
+  # 4. LiteLLM Gateway (The Proxy)
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: ai_litellm
+    restart: always
+    ports:
+      - "4000:4000"
+    environment:
+      # host.docker.internal allows the container to talk to your Mac's native Ollama app
+      - OLLAMA_API_BASE=http://host.docker.internal:11434
+      - DATABASE_URL=postgresql://postgres:securepassword@postgres:5432/langfuse
+    volumes:
+      - ./litellm_config.yaml:/app/config.yaml
+    command: [ "--config", "/app/config.yaml", "--port", "4000" ]
+    networks:
+      - ai-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Required to allow communication to the Mac host on Apple Silicon
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # 5. Langfuse (Observability & Tracing)
+  langfuse:
+    image: langfuse/langfuse:latest
+    container_name: ai_langfuse
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://postgres:securepassword@postgres:5432/langfuse
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=my_super_secret_key_change_me
+      - SALT=my_super_salt_change_me
+    networks:
+      - ai-net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+networks:
+  ai-net:
+    driver: bridge
