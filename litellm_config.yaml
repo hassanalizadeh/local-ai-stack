@@ -2,4 +2,4 @@ model_list:
   - model_name: llama
     litellm_params:
       model: ollama/qwen2.5-coder:14b
-      api_base: http://100.112.208.71:11434 #http://host.docker.internal:11434
+      api_base: ${OLLAMA_API_BASE} #http://host.docker.internal:11434
