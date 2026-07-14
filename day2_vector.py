@@ -1,14 +1,22 @@
 import httpx
+import os
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
+from dotenv import load_dotenv
 
-OLLAMA_EMBED_URL = "http://localhost:11434/api/embeddings"
+# Load the environment variables from the .env file
+load_dotenv()
+
+# Access the variables using os.getenv(key, default_value)
+ollama_base = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+
+OLLAMA_EMBED_URL = ollama_base + "/api/embeddings"
+QDRANT_PORT = os.getenv("QDRANT_REST_PORT")
 QDRANT_HOST = "localhost"
-QDRANT_PORT = 6333
 COLLECTION_NAME = "technical_docs"
 
 # 1. Helper to get embeddings from native Ollama
-def get_embedding(text: str, model: str = "llama3") -> list[float]:
+def get_embedding(text: str, model: str = "qwen2.5-coder:14b") -> list[float]:
     response = httpx.post(OLLAMA_EMBED_URL, json={"model": model, "prompt": text})
     response.raise_for_status()
     return response.json()["embedding"]
