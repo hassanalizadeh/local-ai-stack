@@ -1,28 +1,33 @@
-import httpx
 import os
+import httpx
+from dotenv import load_dotenv
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
-from dotenv import load_dotenv
 
 # Load the environment variables from the .env file
 load_dotenv()
 
-# Access the variables using os.getenv(key, default_value)
-ollama_base = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
-
-OLLAMA_EMBED_URL = ollama_base + "/api/embeddings"
-QDRANT_PORT = os.getenv("QDRANT_REST_PORT")
-QDRANT_HOST = "localhost"
+OLLAMA_API_BASE = os.getenv("OLLAMA_API_BASE", "http://localhost:11434")
+QDRANT_PORT = int(os.getenv("QDRANT_REST_PORT", 6333))
+QDRANT_HOST = "localhost" # Running locally, pointing to the mapped port
 COLLECTION_NAME = "technical_docs"
 
-# 1. Helper to get embeddings from native Ollama
-def get_embedding(text: str, model: str = "qwen2.5-coder:14b") -> list[float]:
-    response = httpx.post(OLLAMA_EMBED_URL, json={"model": model, "prompt": text})
+# 1. Helper to get embeddings using the modern /api/embed endpoint
+def get_embedding(text: str, model: str = "nomic-embed-text") -> list[float]:
+    payload = {
+        "model": model,
+        "input": text  # Changed from 'prompt' to 'input'
+    }
+    
+    embed_url = f"{OLLAMA_API_BASE}/api/embed"
+    response = httpx.post(embed_url, json=payload, timeout=30.0)
     response.raise_for_status()
-    return response.json()["embedding"]
+    
+    # Extract the first vector from the returned embeddings array
+    return response.json()["embeddings"][0]
 
 def main():
-    # Initialize Qdrant Client pointing to Docker container
+    print(f"🔌 Connecting to Qdrant at {QDRANT_HOST}:{QDRANT_PORT}...")
     client = QdrantClient(host=QDRANT_HOST, port=QDRANT_PORT)
     
     # Sample documents with metadata
@@ -33,9 +38,10 @@ def main():
     ]
     
     print("🧠 Extracting baseline embedding to verify vector dimensions...")
+    # This will now use nomic-embed-text and succeed without the 500 error
     sample_vector = get_embedding(docs[0]["text"])
     vector_dimension = len(sample_vector)
-    print(f"📐 Vector Space Dimension: {vector_dimension}")
+    print(f"📐 Vector Space Dimension: {vector_dimension} (Nomic standard is usually 768)")
     
     # 2. Setup Qdrant Collection
     print(f"📁 Re-creating Qdrant collection: '{COLLECTION_NAME}'...")
