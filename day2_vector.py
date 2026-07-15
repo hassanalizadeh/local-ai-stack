@@ -44,8 +44,14 @@ def main():
     print(f"📐 Vector Space Dimension: {vector_dimension} (Nomic standard is usually 768)")
     
     # 2. Setup Qdrant Collection
-    print(f"📁 Re-creating Qdrant collection: '{COLLECTION_NAME}'...")
-    client.recreate_collection(
+    print(f"📁 Preparing Qdrant collection: '{COLLECTION_NAME}'...")
+    
+    # Safely check and delete to mimic the old "recreate" behavior
+    if client.collection_exists(collection_name=COLLECTION_NAME):
+        client.delete_collection(collection_name=COLLECTION_NAME)
+        
+    # Create the fresh collection
+    client.create_collection(
         collection_name=COLLECTION_NAME,
         vectors_config=VectorParams(size=vector_dimension, distance=Distance.COSINE),
     )
@@ -70,11 +76,12 @@ def main():
     print(f"\n🔍 Performing semantic search for: '{query_phrase}'")
     query_vector = get_embedding(query_phrase)
     
-    search_results = client.search(
+    # NEW METHOD: query_points instead of search
+    search_results = client.query_points(
         collection_name=COLLECTION_NAME,
-        query_vector=query_vector,
+        query=query_vector,
         limit=1
-    )
+    ).points  # Make sure to append .points to get the list of hits
     
     for hit in search_results:
         print(f"🎯 Top Match (Score: {hit.score:.4f}):")
