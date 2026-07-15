@@ -1,10 +1,15 @@
+import os
+from dotenv import load_dotenv
 from openai import OpenAI
 from pydantic import BaseModel, Field
+
+# Load the environment variables from the .env file
+load_dotenv()
 
 # Point to your LiteLLM Gateway container endpoint
 client = OpenAI(
     base_url="http://localhost:4000/v1",
-    api_key="anything-goes-here" # LiteLLM proxy satisfies standard headers
+    api_key=os.getenv("LITELLM_MASTER_KEY") # LiteLLM proxy satisfies standard headers
 )
 
 # Define the structured schema target using Pydantic
