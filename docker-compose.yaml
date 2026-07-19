@@ -65,6 +65,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_started
     # Required to allow communication to the Mac host on Apple Silicon
     extra_hosts:
       - "host.docker.internal:host-gateway"
